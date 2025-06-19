@@ -1,103 +1,145 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+
+interface ApiStatus {
+  status: 'started' | 'processing' | 'completed' | 'failed' | 'request';
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [status, setStatus] = useState<ApiStatus>({status: 'started' });
+  const [authcode, setAuthcode] = useState<string | null>();
+  const [isPolling, setIsPolling] = useState(false);
+  const [taskId, setTaskId] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const fetchStatus = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/task-status/${id}`);
+      const data: ApiStatus = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Status fetch error:', error);
+      const e: ApiStatus = {status: 'failed'};
+      return e;
+    }
+  }, []);
+
+  const startAsyncTask = async () => {
+    try {
+      setStatus({ status: 'started' });
+      
+      const response = await fetch('http://127.0.0.1:8000/start-task/', {
+        method: 'POST',
+      });
+      
+      const { task_id: newTaskId } = await response.json();
+      setTaskId(newTaskId);
+      console.log(newTaskId);
+      setIsPolling(true);
+      setStatus({ status: 'started' });
+    } catch (error) {
+      console.error('Task start error:', error);
+      setStatus({ status: 'failed'});
+    }
+  };
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    if (isPolling && taskId) {
+      intervalId = setInterval(async () => {
+        const newStatus = await fetchStatus(taskId);
+        setStatus(newStatus);
+
+        if (newStatus.status === 'completed' || newStatus.status === 'failed') {
+          setIsPolling(false);
+        }
+      }, 3000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isPolling, taskId, fetchStatus]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'started': return 'text-gray-500';
+      case 'processing': return 'text-blue-500';
+      case 'completed': return 'text-green-500';
+      case 'failed': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'started': return '待機中';
+      case 'processing': return '処理中...';
+      case 'completed': return '完了';
+      case 'failed': return 'エラー';
+      default: return '不明';
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-md mx-auto bg-white rounded-lg shadow-md">
+      <h1 className="text-2xl font-bold mb-6 text-center">
+        非同期処理
+      </h1>
+      
+      <div className="space-y-4">
+        <div className="p-4 border rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold">ステータス:</span>
+            <span className={`font-bold ${getStatusColor(status.status)}`}>
+              {getStatusText(status.status)}
+            </span>
+          </div>
+          
+          
+          
+          {taskId && (
+            <p className="text-xs text-gray-400 mt-2">
+              Task ID: {taskId}
+            </p>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <div className="flex space-x-2">
+          <button
+            onClick={startAsyncTask}
+            disabled={isPolling}
+            className={`flex-1 py-2 px-4 rounded-lg font-semibold ${
+              isPolling
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-500 text-white hover:bg-blue-600'
+            } transition-colors`}
+          >
+            {isPolling ? '処理中...' : 'タスク開始'}
+          </button>
+          
+          <button
+            onClick={() => {
+              setIsPolling(false);
+              setStatus({ status: 'started' });
+              setTaskId(null);
+            }}
+            className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+          >
+            リセット
+          </button>
+        </div>
+
+        {isPolling && (
+          <div className="flex items-center justify-center text-sm text-blue-500">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2" />
+            5秒ごとに状態を確認中...
+          </div>
+        )}
+      </div>
     </div>
   );
 }
