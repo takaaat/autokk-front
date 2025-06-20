@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from "next/image";
 
 interface ApiStatus {
   status: 'started' | 'processing' | 'completed' | 'failed' | 'request';
@@ -8,7 +9,6 @@ interface ApiStatus {
 
 export default function Home() {
   const [status, setStatus] = useState<ApiStatus>({status: 'started' });
-  const [authcode, setAuthcode] = useState<string | null>();
   const [isPolling, setIsPolling] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
 
@@ -70,6 +70,7 @@ export default function Home() {
       case 'processing': return 'text-blue-500';
       case 'completed': return 'text-green-500';
       case 'failed': return 'text-red-500';
+      case 'request': return 'text-red-500';
       default: return 'text-gray-500';
     }
   };
@@ -80,6 +81,7 @@ export default function Home() {
       case 'processing': return '処理中...';
       case 'completed': return '完了';
       case 'failed': return 'エラー';
+      case 'request': return '追加認証の要求';
       default: return '不明';
     }
   };
@@ -139,6 +141,26 @@ export default function Home() {
             5秒ごとに状態を確認中...
           </div>
         )}
+
+      {status.status === "request" && (
+        <div>
+        <div className="p-2 bg-yellow-100 text-yellow-800 rounded">
+          追加の認証が要求されています．
+        </div>
+      <div className="mt-4 flex justify-center">
+        <Image
+          src={`http://127.0.0.1:8000/image/${taskId}.png`}
+          alt="表示画像"
+          className="max-w-xs rounded shadow"
+        width={300}
+        height={300}
+
+        />
+      </div>
+
+        </div>
+
+      )}
       </div>
     </div>
   );
